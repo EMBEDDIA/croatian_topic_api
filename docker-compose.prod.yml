@@ -1,0 +1,58 @@
+version: "3.7"
+
+services:
+  web:
+    build:
+      context: ./services/web
+      dockerfile: Dockerfile.prod
+    command: gunicorn --bind 0.0.0.0:5000 manage:app
+    volumes:
+      - static_volume:/home/app/web/project/static
+      - media_volume:/home/app/web/project/media
+    expose:
+      - 5000
+    env_file:
+      - ./.env.prod
+    depends_on:
+      - db
+      - redis
+  db:
+    image: postgres:12-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - ./.env.prod
+  nginx:
+    build: ./services/nginx
+    volumes:
+      - static_volume:/home/app/web/project/static
+      - media_volume:/home/app/web/project/media
+    ports:
+      - 80:80
+    depends_on:
+      - web
+  worker:
+    build:
+      context: ./services/celery-queue
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env.dev
+    ports:
+     - "5555:5555"
+    volumes:
+      - celery-flower_data:/persistent
+    depends_on:
+      - redis
+  redis:
+    image: redis:5-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
+
+volumes:
+  static_volume:
+  media_volume:
+  postgres_data:
+  redis-data:
+  celery-flower_data:
